@@ -52,48 +52,135 @@ def pcl_callback(pcl_msg):
 # Exercise-2 TODOs:
 
     # TODO: Convert ROS msg to PCL data
-    
-    # TODO: Statistical Outlier Filtering
+    cloud = ros_to_pcl(pcl_msg)
 
     # TODO: Voxel Grid Downsampling
+    vox = cloud.make_voxel_grid_filter()
+    LEAF_SIZE = 0.008
+    vox.set_leaf_size(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE)
+    cloud_filtered = vox.filter()    
 
     # TODO: PassThrough Filter
+    passthrough = cloud_filtered.make_passthrough_filter()
+    filter_axis = 'z'
+    axis_min = 0.6
+    axis_max = 1.2
+    passthrough.set_filter_field_name(filter_axis)
+    passthrough.set_filter_limits(axis_min, axis_max)
+    cloud_filtered = passthrough.filter()
+
+    passthrough = cloud_filtered.make_passthrough_filter()
+    filter_axis = 'y'
+    axis_min = -0.5
+    axis_max = 0.5
+    passthrough.set_filter_field_name(filter_axis)
+    passthrough.set_filter_limits(axis_min, axis_max)
+    cloud_filtered = passthrough.filter()
+
+    # TODO: Outlier Removal Filter
+    outlier_filter = cloud_filtered.make_statistical_outlier_filter()
+
+    # Set the number of neighboring points to analyze for any given point
+    outlier_filter.set_mean_k(40)
+
+    # Set threshold scale factor
+    x = 0.1
+
+    # Any point with a mean distance larger than global (mean distance+x*std_dev) will be considered outlier
+    outlier_filter.set_std_dev_mul_thresh(x)
+
+    # Finally call the filter function for magic
+    cloud_filtered = outlier_filter.filter()
 
     # TODO: RANSAC Plane Segmentation
-
+    seg = cloud_filtered.make_segmenter()
+    seg.set_model_type(pcl.SACMODEL_PLANE)
+    seg.set_method_type(pcl.SAC_RANSAC)
+    max_distance = .01  # 0.04 to get rid of table edge
+    seg.set_distance_threshold(max_distance)
+    inliers, coefficients = seg.segment()
+    
     # TODO: Extract inliers and outliers
+    cloud_objects = cloud_filtered.extract(inliers, negative=True)
 
     # TODO: Euclidean Clustering
+    white_cloud = XYZRGB_to_XYZ(cloud_objects)
+    tree = white_cloud.make_kdtree()
 
     # TODO: Create Cluster-Mask Point Cloud to visualize each cluster separately
+    ec = white_cloud.make_EuclideanClusterExtraction()
+
+    ec.set_ClusterTolerance(0.03)
+    ec.set_MinClusterSize(10)
+    ec.set_MaxClusterSize(4000)
+
+    # ec.set_SearchMethod(tree)
+    cluster_indices = ec.Extract()
+
+    cluster_color = get_color_list(len(cluster_indices))
+
+    color_cluster_point_list = []
+
+    for j, indices in enumerate(cluster_indices):
+        for i, indice in enumerate(indices):
+            color_cluster_point_list.append([white_cloud[indice][0],
+                                            white_cloud[indice][1],
+                                            white_cloud[indice][2],
+                                             rgb_to_float(cluster_color[j])])
+
+    #Create new cloud containing all clusters, each with unique color
+    cluster_cloud = pcl.PointCloud_PointXYZRGB()
+    cluster_cloud.from_list(color_cluster_point_list)
 
     # TODO: Convert PCL data to ROS messages
+    ros_cloud_objects = pcl_to_ros(cluster_cloud)
 
     # TODO: Publish ROS messages
+    pcl_objects_pub.publish(ros_cloud_objects)
 
 # Exercise-3 TODOs:
+    # detected_objects_labels = []
+    detected_objects = []
+    # # Classify the clusters! (loop through each detected cluster one at a time)
 
-    # Classify the clusters! (loop through each detected cluster one at a time)
+    # for index, pts_list in enumerate(cluster_indices):
+    #     # Grab the points for the cluster
+    #     pcl_cluster = cloud_objects.extract(pts_list)
+    #     ros_cluster = pcl_to_ros(pcl_cluster)
+    #     # Compute the associated feature vector
+    #     chists = compute_color_histograms(ros_cluster, using_hsv=True)
+    #     normals = get_normals(ros_cluster)
+    #     nhists = compute_normal_histograms(normals)
+    #     feature = np.concatenate((chists, nhists))
+    #     # Make the prediction
+    #     prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
+    #     label = encoder.inverse_transform(prediction)[0]
+    #     detected_objects_labels.append(label)
 
-        # Grab the points for the cluster
+    #     # Publish a label into RViz
+    #     label_pos = list(white_cloud[pts_list[0]])
+    #     label_pos[2] += .4
+    #     object_markers_pub.publish(make_label(label,label_pos, index))
 
-        # Compute the associated feature vector
+    #     # Add the detected object to the list of detected objects.
+    #     do = DetectedObject()
+    #     do.label = label
+    #     do.cloud = ros_cluster
+    #     detected_objects.append(do)
 
-        # Make the prediction
+    # rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
 
-        # Publish a label into RViz
-
-        # Add the detected object to the list of detected objects.
-
-    # Publish the list of detected objects
+    # # Publish the list of detected objects
+    # detected_objects_pub.publish(detected_objects)
 
     # Suggested location for where to invoke your pr2_mover() function within pcl_callback()
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
-    try:
-        pr2_mover(detected_objects_list)
-    except rospy.ROSInterruptException:
-        pass
+    # try:
+    #     # pr2_mover(detected_objects_list)
+    #     pr2_mover(detected_objects)
+    # except rospy.ROSInterruptException:
+    #     pass
 
 # function to load parameters and request PickPlace service
 def pr2_mover(object_list):
@@ -137,10 +224,13 @@ def pr2_mover(object_list):
 if __name__ == '__main__':
 
     # TODO: ROS node initialization
+    rospy.init_node('recognition', anonymous=True)
 
     # TODO: Create Subscribers
+    pcl_sub = rospy.Subscriber('/pr2/world/points', pc2.PointCloud2, pcl_callback, queue_size=1)
 
     # TODO: Create Publishers
+    pcl_objects_pub = rospy.Publisher('/pcl_objects', PointCloud2, queue_size=1)
 
     # TODO: Load Model From disk
 
@@ -148,3 +238,5 @@ if __name__ == '__main__':
     get_color_list.color_list = []
 
     # TODO: Spin while node is not shutdown
+    while not rospy.is_shutdown():
+        rospy.spin()
