@@ -2,6 +2,11 @@
 ### Writeup Template: You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
 
 ---
+Features in Training Set: 1350
+Invalid Features in Training set: 2
+Scores: [ 0.93703704  0.95185185  0.95555556  0.9330855   0.94423792]
+Accuracy: 0.94 (+/- 0.02)
+accuracy score: 0.944362017804
 
 
 # Required Steps for a Passing Submission:
