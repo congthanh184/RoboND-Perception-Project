@@ -304,8 +304,8 @@ if __name__ == '__main__':
     get_color_list.color_list = []
 
     TEST_SCENE_NUM = Int32()
-    TEST_SCENE_NUM.data = 1
-    yaml_output_filename = 'output_1.yaml'
+    TEST_SCENE_NUM.data = 3
+    yaml_output_filename = 'output_3.yaml'
     # TODO: Spin while node is not shutdown
     while not rospy.is_shutdown():
         rospy.spin()
