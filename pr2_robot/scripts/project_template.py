@@ -55,6 +55,7 @@ def voxel_downsampling(cloud):
 
 def filter_passthrough_zy(cloud):
     # TODO: PassThrough Filter
+    # Passthrough z axis
     passthrough = cloud.make_passthrough_filter()
     filter_axis = 'z'
     axis_min = 0.6
@@ -62,7 +63,7 @@ def filter_passthrough_zy(cloud):
     passthrough.set_filter_field_name(filter_axis)
     passthrough.set_filter_limits(axis_min, axis_max)
     cloud_filtered = passthrough.filter()
-
+    # Passthrough y axis
     passthrough = cloud_filtered.make_passthrough_filter()
     filter_axis = 'y'
     axis_min = -0.5
